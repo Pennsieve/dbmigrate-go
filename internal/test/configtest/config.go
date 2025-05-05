@@ -1,7 +1,7 @@
 package configtest
 
 import (
-	"github.com/pennsieve/dbmigrate-go/internal/shared/config"
+	config2 "github.com/pennsieve/dbmigrate-go/pkg/shared/config"
 )
 
 // PostgresDBConfig returns a config.PostgresDBConfig suitable for use against
@@ -9,9 +9,9 @@ import (
 // calling config.LoadPostgresDBConfig() because that method
 // will not create the correct configs if the tests are running locally instead
 // of in the Docker test container.
-func PostgresDBConfig(options ...PostgresOption) config.PostgresDBConfig {
-	defaultSettings := config.NewDefaultSettings()
-	builder := config.NewPostgresDBConfigBuilder(defaultSettings).
+func PostgresDBConfig(options ...PostgresOption) config2.PostgresDBConfig {
+	defaultSettings := config2.NewDefaultSettings()
+	builder := config2.NewPostgresDBConfigBuilder(defaultSettings).
 		WithPostgresUser("postgres").
 		WithPostgresPassword("password")
 	for _, option := range options {
@@ -20,22 +20,22 @@ func PostgresDBConfig(options ...PostgresOption) config.PostgresDBConfig {
 	return builder.Build()
 }
 
-type PostgresOption func(builder *config.PostgresDBConfigBuilder) *config.PostgresDBConfigBuilder
+type PostgresOption func(builder *config2.PostgresDBConfigBuilder) *config2.PostgresDBConfigBuilder
 
 func WithPort(port int) PostgresOption {
-	return func(builder *config.PostgresDBConfigBuilder) *config.PostgresDBConfigBuilder {
+	return func(builder *config2.PostgresDBConfigBuilder) *config2.PostgresDBConfigBuilder {
 		return builder.WithPort(port)
 	}
 }
 
 func WithHost(host string) PostgresOption {
-	return func(builder *config.PostgresDBConfigBuilder) *config.PostgresDBConfigBuilder {
+	return func(builder *config2.PostgresDBConfigBuilder) *config2.PostgresDBConfigBuilder {
 		return builder.WithHost(host)
 	}
 }
 
 func WithSchema(schema string) PostgresOption {
-	return func(builder *config.PostgresDBConfigBuilder) *config.PostgresDBConfigBuilder {
+	return func(builder *config2.PostgresDBConfigBuilder) *config2.PostgresDBConfigBuilder {
 		return builder.WithSchema(schema)
 	}
 }
