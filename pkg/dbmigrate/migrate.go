@@ -11,6 +11,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	"github.com/golang-migrate/migrate/v4/source"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pennsieve/dbmigrate-go/pkg/shared/config"
 	"io"
 	"net"
 	"net/url"
@@ -21,7 +22,7 @@ type DatabaseMigrator struct {
 	wrapped *migrate.Migrate
 }
 
-func NewRDSProxyDatabaseMigrator(ctx context.Context, migrateConfig Config, migrationsSource source.Driver, awsConfig aws.Config) (*DatabaseMigrator, error) {
+func NewRDSProxyDatabaseMigrator(ctx context.Context, migrateConfig config.Config, migrationsSource source.Driver, awsConfig aws.Config) (*DatabaseMigrator, error) {
 	authenticationToken, err := auth.BuildAuthToken(
 		ctx,
 		fmt.Sprintf("%s:%d", migrateConfig.PostgresDB.Host, migrateConfig.PostgresDB.Port),
@@ -44,7 +45,7 @@ func NewRDSProxyDatabaseMigrator(ctx context.Context, migrateConfig Config, migr
 		migrateConfig.VerboseLogging)
 }
 
-func NewLocalMigrator(ctx context.Context, migrateConfig Config, migrationsSource source.Driver) (*DatabaseMigrator, error) {
+func NewLocalMigrator(ctx context.Context, migrateConfig config.Config, migrationsSource source.Driver) (*DatabaseMigrator, error) {
 	if migrateConfig.PostgresDB.Password == nil {
 		return nil, fmt.Errorf("password cannot be nil for local Migrator")
 	}
