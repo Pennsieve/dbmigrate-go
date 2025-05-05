@@ -1,0 +1,21 @@
+networks:
+  tests:
+    driver: bridge
+
+services:
+  local-testing:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      - pennsievedb-dbmigrate
+    networks:
+      - tests
+
+  pennsievedb-dbmigrate:
+    image: pennsieve/pennsievedb-collections:20250422101951-seed
+    restart: always
+    ports:
+      - "5432:5432"
+    networks:
+      - tests
