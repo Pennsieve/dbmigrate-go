@@ -2,7 +2,7 @@ package dbmigratetest
 
 import (
 	"github.com/pennsieve/dbmigrate-go/internal/test/configtest"
-	"github.com/pennsieve/dbmigrate-go/pkg/dbmigrate"
+	"github.com/pennsieve/dbmigrate-go/pkg/shared/config"
 )
 
 // Config returns a dbmigrate.Config suitable for use against
@@ -10,8 +10,8 @@ import (
 // calling dbmigrate.LoadConfig() because that method
 // will not create the correct configs if the tests are running locally instead
 // of in the Docker test container.
-func Config(pgOptions ...configtest.PostgresOption) dbmigrate.Config {
-	return dbmigrate.Config{
+func Config(pgOptions ...configtest.PostgresOption) config.Config {
+	return config.Config{
 		PostgresDB:     configtest.PostgresDBConfig(pgOptions...),
 		VerboseLogging: true,
 	}
