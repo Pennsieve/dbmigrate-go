@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/jackc/pgx/v5"
 	"github.com/pennsieve/dbmigrate-go/internal/shared/config"
 	"github.com/stretchr/testify/require"
 )
