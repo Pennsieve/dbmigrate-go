@@ -1,4 +1,4 @@
-.PHONY: help clean test test-ci package publish docker-clean vet tidy docker-image-clean clean-ci package-dbmigrate test-ci-local
+.PHONY: help clean test test-ci docker-clean vet tidy test-ci-local
 
 LAMBDA_BUCKET ?= "pennsieve-cc-lambda-functions-use1"
 WORKING_DIR   ?= "$(shell pwd)"
@@ -18,7 +18,7 @@ local-services:
 	docker compose -f docker-compose.test.yml -f docker-compose.local.override.yml up -d local-testing
 
 test: local-services
-	go test -v -p 1 ./...
+	go test -v ./...
 
 test-ci:
 	docker compose -f docker-compose.test.yml down --remove-orphans
@@ -32,11 +32,9 @@ test-ci-local:
 
 # Spin down active docker containers.
 docker-clean:
-	#docker compose -f docker-compose.test.yml -f docker-compose.build-postgres.yml down
 	docker compose -f docker-compose.test.yml down
 
 clean: docker-clean
-		rm -rf $(WORKING_DIR)/bin
 
 clean-ci: clean
 

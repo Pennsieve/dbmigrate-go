@@ -7,20 +7,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/pennsieve/dbmigrate-go/internal/test"
-	"github.com/pennsieve/dbmigrate-go/internal/test/configtest"
-	"github.com/pennsieve/dbmigrate-go/internal/test/dbmigratetest"
+	"github.com/pennsieve/dbmigrate-go/pkg/config"
 	"github.com/pennsieve/dbmigrate-go/pkg/dbmigrate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
-	"net"
-	"strconv"
 	"testing"
 	"time"
 )
 
-//go:embed migrations/*.sql
+//go:embed testdata/migrations/*.sql
 var migrationsFS embed.FS
 
 func TestDatabaseMigrator(t *testing.T) {
@@ -35,42 +30,14 @@ func TestDatabaseMigrator(t *testing.T) {
 		//{"prevent empty DOI", testPreventEmptyDOI},
 	}
 
-	// Set up testcontainer that will be used by all tests.
-	// Using a self-contained container since we can't use the shared pennsievedb-collections container for these
-	// migration tests.
-	// Also, so that we don't have to start a pre-collections pennsievedb seed in docker compose only for these tests
 	ctx := context.Background()
 
-	containerReq := testcontainers.ContainerRequest{
-		Image:        "pennsieve/pennsievedb:V20241120161735-seed",
-		ExposedPorts: []string{"5432/tcp"},
-		WaitingFor: wait.ForLog("database system is ready to accept connections").
-			WithStartupTimeout(5 * time.Second),
-	}
-
-	pennsievedb, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: containerReq,
-		Started:          true,
-	})
-	testcontainers.CleanupContainer(t, pennsievedb)
-	require.NoError(t, err)
-
-	hostPort, err := pennsievedb.Endpoint(ctx, "")
-	require.NoError(t, err)
-
-	host, portStr, err := net.SplitHostPort(hostPort)
-	require.NoError(t, err)
-	port, err := strconv.Atoi(portStr)
-	require.NoError(t, err)
-
 	schema := "repositories"
-	migrateConfig := dbmigratetest.Config(
-		configtest.WithHost(host),
-		configtest.WithPort(port),
-		configtest.WithSchema(schema),
-	)
+	testSettings := test.NewTestSettings(schema)
+	migrateConfig, err := config.LoadConfig(testSettings)
+	require.NoError(t, err)
 
-	migrationsSource, err := iofs.New(migrationsFS, "migrations")
+	migrationsSource, err := iofs.New(migrationsFS, "testdata/migrations")
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -86,7 +53,7 @@ func TestDatabaseMigrator(t *testing.T) {
 
 			t.Cleanup(func() {
 				require.NoError(t, migrator.Drop())
-				dbmigratetest.Close(t, migrator)
+				test.Close(t, migrator)
 				test.CloseConnection(ctx, t, verificationConn)
 			})
 

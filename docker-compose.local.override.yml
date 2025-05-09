@@ -13,7 +13,7 @@ services:
       - tests
 
   pennsievedb-dbmigrate:
-    image: pennsieve/pennsievedb-collections:20250422101951-seed
+    image: pennsieve/pennsievedb:V20241120161735-seed
     restart: always
     ports:
       - "5432:5432"
