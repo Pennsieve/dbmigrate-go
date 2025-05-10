@@ -7,11 +7,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"math/rand"
+	"os"
 	"strconv"
 	"testing"
 )
 
 func TestLoadConfig_EmptyDefaultSettings(t *testing.T) {
+	// Need to unset vars for CI
+	unsetConfigEnvVars(t)
+
 	settings := config.NewDefaultSettings()
 	emptyConfig, err := config.LoadConfig(settings)
 	require.NoError(t, err)
@@ -77,7 +81,32 @@ func TestLoadConfig_DefaultSettings(t *testing.T) {
 	settings[config.PostgresDatabaseKey] = expected.PostgresDB.Database
 	settings[config.PostgresSchemaKey] = expected.PostgresDB.Schema
 
+	// Need to unset vars for CI
+	unsetConfigEnvVars(t)
+
 	settingsConfig, err := config.LoadConfig(settings)
 	require.NoError(t, err)
 	assert.Equal(t, expected, settingsConfig)
+}
+
+// Unsetenv unsets the environment variable 'key' in the scope of 't' and will
+// reset it to its previous value (if any) when the test scoped by 't' completes.
+func unsetenv(t *testing.T, key string) {
+	t.Helper()
+	// Setenv takes care of registering the value-reset with its Cleanup method.
+	// But setting the value to "" is not the same as unsetting it, so we follow
+	// with an Unsetenv.
+	t.Setenv(key, "")
+	require.NoError(t, os.Unsetenv(key))
+}
+
+func unsetConfigEnvVars(t *testing.T) {
+	t.Helper()
+	unsetenv(t, config.VerboseLoggingKey)
+	unsetenv(t, config.PostgresHostKey)
+	unsetenv(t, config.PostgresPortKey)
+	unsetenv(t, config.PostgresUserKey)
+	unsetenv(t, config.PostgresPasswordKey)
+	unsetenv(t, config.PostgresDatabaseKey)
+	unsetenv(t, config.PostgresSchemaKey)
 }
