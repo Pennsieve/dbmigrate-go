@@ -5,9 +5,10 @@ import (
 )
 
 // NewTestSettings returns a config.DefaultSettings for running tests against
-// the DB started by docker-compose.test.yml.
-// When tests are run CI in Docker these settings will be handled by env vars
-// set in the Docker container. But this function returns settings that will
+// the DB started by docker-compose.test.yml whether run locally or in the
+// test Docker container.
+// When tests are run by CI in Docker these settings will be handled by env vars
+// set in the Docker container. But this function provides fallback, default settings that will
 // allow tests to also run locally outside of Docker where the env vars are not
 // set.
 func NewTestSettings(testSchema string) config.DefaultSettings {
