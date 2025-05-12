@@ -10,6 +10,6 @@ See [config.go](pkg/config/config.go) and [postgres.go](pkg/config/postgres.go) 
 configure the database connection for migrations.
 
 You will also need to create a [Migration Source](https://github.com/golang-migrate/migrate?tab=readme-ov-file#migration-sources)
-to read migration files. The examples above all use `io/fs` but migration source types are available.
+to read migration files. The examples above all use `io/fs` but other migration source types are available.
 
 See [Migration Files](https://github.com/golang-migrate/migrate?tab=readme-ov-file#migration-files) for naming and writing migration files.
