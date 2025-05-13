@@ -11,4 +11,4 @@ COPY pkg pkg
 COPY internal internal
 RUN ["go", "mod", "tidy"]
 
-CMD ["go", "test", "-v", "-p", "1", "./..."]
+CMD ["go", "test", "-v", "./..."]

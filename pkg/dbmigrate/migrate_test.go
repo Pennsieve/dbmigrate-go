@@ -3,74 +3,40 @@ package dbmigrate_test
 import (
 	"context"
 	"embed"
+	"fmt"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/pennsieve/dbmigrate-go/internal/test"
-	"github.com/pennsieve/dbmigrate-go/internal/test/configtest"
-	"github.com/pennsieve/dbmigrate-go/internal/test/dbmigratetest"
+	"github.com/pennsieve/dbmigrate-go/pkg/config"
 	"github.com/pennsieve/dbmigrate-go/pkg/dbmigrate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
-	"net"
-	"strconv"
 	"testing"
 	"time"
 )
 
-//go:embed migrations/*.sql
+//go:embed testdata/migrations/*.sql
 var migrationsFS embed.FS
+
+const schema = "test_schema"
 
 func TestDatabaseMigrator(t *testing.T) {
 	tests := []struct {
 		scenario string
 		tstFunc  func(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificationConn *pgx.Conn)
 	}{
-		//{"test up and collections created_at and updated_at", testUp},
+		{"test Up", testUp},
 		{"Up and Down run without error", testUpAndDown},
-		//{"prevent empty name", testPreventEmptyName},
-		//{"prevent all white space name", testPreventWhiteSpaceName},
-		//{"prevent empty DOI", testPreventEmptyDOI},
 	}
 
-	// Set up testcontainer that will be used by all tests.
-	// Using a self-contained container since we can't use the shared pennsievedb-collections container for these
-	// migration tests.
-	// Also, so that we don't have to start a pre-collections pennsievedb seed in docker compose only for these tests
 	ctx := context.Background()
 
-	containerReq := testcontainers.ContainerRequest{
-		Image:        "pennsieve/pennsievedb:V20241120161735-seed",
-		ExposedPorts: []string{"5432/tcp"},
-		WaitingFor: wait.ForLog("database system is ready to accept connections").
-			WithStartupTimeout(5 * time.Second),
-	}
-
-	pennsievedb, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: containerReq,
-		Started:          true,
-	})
-	testcontainers.CleanupContainer(t, pennsievedb)
+	testSettings := test.NewTestSettings(schema)
+	migrateConfig, err := config.LoadConfig(testSettings)
 	require.NoError(t, err)
 
-	hostPort, err := pennsievedb.Endpoint(ctx, "")
-	require.NoError(t, err)
-
-	host, portStr, err := net.SplitHostPort(hostPort)
-	require.NoError(t, err)
-	port, err := strconv.Atoi(portStr)
-	require.NoError(t, err)
-
-	schema := "repositories"
-	migrateConfig := dbmigratetest.Config(
-		configtest.WithHost(host),
-		configtest.WithPort(port),
-		configtest.WithSchema(schema),
-	)
-
-	migrationsSource, err := iofs.New(migrationsFS, "migrations")
+	migrationsSource, err := iofs.New(migrationsFS, "testdata/migrations")
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -86,7 +52,7 @@ func TestDatabaseMigrator(t *testing.T) {
 
 			t.Cleanup(func() {
 				require.NoError(t, migrator.Drop())
-				dbmigratetest.Close(t, migrator)
+				test.Close(t, migrator)
 				test.CloseConnection(ctx, t, verificationConn)
 			})
 
@@ -99,12 +65,16 @@ func testUp(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificationConn
 
 	require.NoError(t, migrator.Up())
 
+	tableIdentifier := pgx.Identifier{schema, "test_table"}.Sanitize()
+
+	insertQuery := fmt.Sprintf(`INSERT INTO %s (name, description, node_id) VALUES (@name, @description, @node_id) RETURNING id, created_at, updated_at`,
+		tableIdentifier)
 	ctx := context.Background()
 	var id int64
 	var createdAt, updatedAt time.Time
 	require.NoError(t,
 		verificationConn.QueryRow(ctx,
-			"INSERT INTO collections.collections (name, description, node_id) VALUES (@name, @description, @node_id) RETURNING id, created_at, updated_at",
+			insertQuery,
 			pgx.NamedArgs{
 				"name":        uuid.NewString(),
 				"description": uuid.NewString(),
@@ -114,10 +84,12 @@ func testUp(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificationConn
 	assert.False(t, createdAt.IsZero())
 	assert.False(t, updatedAt.IsZero())
 
+	verificationQuery := fmt.Sprintf(`UPDATE %s SET description = @description WHERE id = @id RETURNING updated_at`,
+		tableIdentifier)
 	var updatedUpdatedAt time.Time
 	require.NoError(t,
 		verificationConn.QueryRow(ctx,
-			"UPDATE collections.collections SET description = @description WHERE id = @id RETURNING updated_at",
+			verificationQuery,
 			pgx.NamedArgs{
 				"description": uuid.NewString(),
 				"id":          id,
@@ -136,84 +108,4 @@ func testUpAndDown(t *testing.T, migrator *dbmigrate.DatabaseMigrator, _ *pgx.Co
 	require.NoError(t, migrator.Up())
 
 	require.NoError(t, migrator.Down())
-}
-
-func testPreventEmptyName(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificationConn *pgx.Conn) {
-	require.NoError(t, migrator.Up())
-
-	ctx := context.Background()
-
-	_, err := verificationConn.Exec(ctx,
-		"INSERT INTO collections.collections (name, description, node_id) VALUES (@name, @description, @node_id)",
-		pgx.NamedArgs{
-			"name":        "",
-			"description": uuid.NewString(),
-			"node_id":     uuid.NewString()},
-	)
-	require.Error(t, err)
-
-	emptyNameRows, err := verificationConn.Query(ctx, "SELECT id FROM collections.collections WHERE name = ''")
-	require.NoError(t, err)
-
-	emptyNameIDs, err := pgx.CollectRows(emptyNameRows, pgx.RowTo[int64])
-	require.NoError(t, err)
-	assert.Empty(t, emptyNameIDs)
-
-}
-
-func testPreventWhiteSpaceName(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificationConn *pgx.Conn) {
-	require.NoError(t, migrator.Up())
-
-	ctx := context.Background()
-
-	whiteSpaceName := "   "
-	_, err := verificationConn.Exec(ctx,
-		"INSERT INTO collections.collections (name, description, node_id) VALUES (@name, @description, @node_id)",
-		pgx.NamedArgs{
-			"name":        whiteSpaceName,
-			"description": uuid.NewString(),
-			"node_id":     uuid.NewString()},
-	)
-	require.Error(t, err)
-
-	emptyNameRows, err := verificationConn.Query(ctx, "SELECT id FROM collections.collections WHERE name = @white_space_name",
-		pgx.NamedArgs{"white_space_name": whiteSpaceName})
-	require.NoError(t, err)
-
-	emptyNameIDs, err := pgx.CollectRows(emptyNameRows, pgx.RowTo[int64])
-	require.NoError(t, err)
-	assert.Empty(t, emptyNameIDs)
-
-}
-
-func testPreventEmptyDOI(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificationConn *pgx.Conn) {
-	require.NoError(t, migrator.Up())
-
-	ctx := context.Background()
-
-	var collectionID int64
-	err := verificationConn.QueryRow(ctx,
-		"INSERT INTO collections.collections (name, description, node_id) VALUES (@name, @description, @node_id) RETURNING id",
-		pgx.NamedArgs{
-			"name":        uuid.NewString(),
-			"description": uuid.NewString(),
-			"node_id":     uuid.NewString()},
-	).Scan(&collectionID)
-	require.NoError(t, err)
-
-	_, err = verificationConn.Exec(ctx,
-		"INSERT INTO collections.dois (collection_id, doi) VALUES (@collection_id, @doi)",
-		pgx.NamedArgs{
-			"collection_id": collectionID,
-			"doi":           ""},
-	)
-	require.Error(t, err)
-
-	emptyDOIRows, err := verificationConn.Query(ctx, "SELECT id FROM collections.dois WHERE doi = ''")
-	require.NoError(t, err)
-
-	emptyDOIIDs, err := pgx.CollectRows(emptyDOIRows, pgx.RowTo[int64])
-	require.NoError(t, err)
-	assert.Empty(t, emptyDOIIDs)
-
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	"github.com/golang-migrate/migrate/v4/source"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/pennsieve/dbmigrate-go/pkg/shared/config"
+	"github.com/pennsieve/dbmigrate-go/pkg/config"
 	"io"
 	"net"
 	"net/url"
@@ -141,7 +141,7 @@ func newDatabaseMigrator(ctx context.Context, username, password, host string,
 
 	// Now we can create the Migrate instance
 	m, err := migrate.NewWithInstance(
-		"migration iofs",
+		"migration source",
 		migrationsSource,
 		"postgres",
 		driver)
@@ -149,7 +149,7 @@ func newDatabaseMigrator(ctx context.Context, username, password, host string,
 		return nil, closeOnError(fmt.Errorf("error creating Migrate instance: %w", err), driver, migrationsSource)
 	}
 	// we use this logger too in a couple of places, so need it non-nil
-	m.Log = NewLogger(verboseLogging)
+	m.Log = newLogger(verboseLogging)
 	return &DatabaseMigrator{wrapped: m}, nil
 }
 
