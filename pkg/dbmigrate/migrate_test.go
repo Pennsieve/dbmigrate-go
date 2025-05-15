@@ -27,6 +27,7 @@ func TestDatabaseMigrator(t *testing.T) {
 		tstFunc  func(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificationConn *pgx.Conn)
 	}{
 		{"test Up", testUp},
+		{"test Migrate", testMigrate},
 		{"Up and Down run without error", testUpAndDown},
 	}
 
@@ -98,6 +99,38 @@ func testUp(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificationConn
 	)
 	assert.False(t, updatedUpdatedAt.IsZero())
 	assert.False(t, updatedAt.Equal(updatedUpdatedAt))
+}
+
+func testMigrate(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificationConn *pgx.Conn) {
+	ctx := context.Background()
+
+	// Only run the first migration
+	require.NoError(t, migrator.Migrate(20250319124829))
+
+	expectedFunctionName := fmt.Sprintf("%s.update_updated_at_column", schema)
+
+	// function should exist
+	var functionName string
+	require.NoError(t, verificationConn.QueryRow(ctx, fmt.Sprintf(`SELECT to_regproc('%s')`, expectedFunctionName)).Scan(&functionName))
+	assert.NotNil(t, functionName)
+	assert.Equal(t, expectedFunctionName, functionName)
+
+	expectedTableName := fmt.Sprintf("%s.test_table", schema)
+	tableExistsQuery := fmt.Sprintf(`SELECT to_regclass('%s')`, expectedTableName)
+
+	// but table should not exist yet
+	var tableName *string
+	require.NoError(t, verificationConn.QueryRow(ctx, tableExistsQuery).Scan(&tableName))
+	assert.Nil(t, tableName)
+
+	// now run all the remaining migrations
+	require.NoError(t, migrator.Up())
+
+	// now table exists
+	require.NoError(t, verificationConn.QueryRow(ctx, tableExistsQuery).Scan(&tableName))
+	require.NotNil(t, tableName)
+	require.Equal(t, expectedTableName, *tableName)
+
 }
 
 // We don't really use the Down() method for real. Test is here so that

@@ -62,7 +62,7 @@ func NewLocalMigrator(ctx context.Context, migrateConfig config.Config, migratio
 
 }
 
-// Up will run any un-applied migrations
+// Up looks at the currently active migration version and will migrate all the way up (applying all up migrations).
 func (m *DatabaseMigrator) Up() error {
 	if err := m.wrapped.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
@@ -74,6 +74,19 @@ func (m *DatabaseMigrator) Up() error {
 	return nil
 }
 
+// Migrate looks at the currently active migration version, then migrates either up or down to the specified version.
+func (m *DatabaseMigrator) Migrate(version uint) error {
+	if err := m.wrapped.Migrate(version); err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			m.wrapped.Log.Printf("no changes")
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// Down looks at the currently active migration version and will migrate all the way down (applying all down migrations).
 func (m *DatabaseMigrator) Down() error {
 	if err := m.wrapped.Down(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
