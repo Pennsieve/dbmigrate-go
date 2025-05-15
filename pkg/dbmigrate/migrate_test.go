@@ -109,6 +109,7 @@ func testMigrate(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificatio
 
 	expectedFunctionName := fmt.Sprintf("%s.update_updated_at_column", schema)
 
+	// function should exist
 	var functionName string
 	require.NoError(t, verificationConn.QueryRow(ctx, fmt.Sprintf(`SELECT to_regproc('%s')`, expectedFunctionName)).Scan(&functionName))
 	assert.NotNil(t, functionName)
@@ -117,6 +118,7 @@ func testMigrate(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificatio
 	expectedTableName := fmt.Sprintf("%s.test_table", schema)
 	tableExistsQuery := fmt.Sprintf(`SELECT to_regclass('%s')`, expectedTableName)
 
+	// but table should not exist yet
 	var tableName *string
 	require.NoError(t, verificationConn.QueryRow(ctx, tableExistsQuery).Scan(&tableName))
 	assert.Nil(t, tableName)
@@ -124,6 +126,7 @@ func testMigrate(t *testing.T, migrator *dbmigrate.DatabaseMigrator, verificatio
 	// now run all the remaining migrations
 	require.NoError(t, migrator.Up())
 
+	// now table exists
 	require.NoError(t, verificationConn.QueryRow(ctx, tableExistsQuery).Scan(&tableName))
 	require.NotNil(t, tableName)
 	require.Equal(t, expectedTableName, *tableName)
